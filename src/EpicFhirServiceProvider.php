@@ -23,6 +23,21 @@ class EpicFhirServiceProvider extends ServiceProvider
                 __DIR__.'/Database/Migrations/' => database_path('migrations'),
             ], 'epic-fhir-migrations');
         }
+        // ────────────────────────────────────────────────
+        // Automatically register your Epic routes
+        // ────────────────────────────────────────────────
+        Route::prefix('epic')
+            ->middleware('web')           // applies session, CSRF, etc.
+            ->group(function () {
+                Route::get('/jwks', [UserController::class, 'jwks'])
+                    ->name('epic.jwks');
+
+                Route::get('/launch', [UserController::class, 'smartOnFhir'])
+                    ->name('epic.launch');
+
+                Route::get('/callback', [UserController::class, 'callback'])
+                    ->name('epic.callback');
+            });
 
         // You can also publish keys folder if needed (careful with secrets!)
         // $this->publishes([...], 'epic-fhir-keys');
