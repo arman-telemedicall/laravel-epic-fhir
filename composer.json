@@ -29,6 +29,12 @@
             }
         }
     },
+	"repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/arman-telemedicall/laravel-epic-fhir"
+        }
+    ],
     "minimum-stability": "dev",
     "prefer-stable": true
 }
