@@ -1,6 +1,6 @@
 <?php
 
-namespace Telemedicall\EpicFhir\Support;
+namespace Telemedicall\EpicFhir\Database\Traits;
 
 use Illuminate\Support\Arr;
 
