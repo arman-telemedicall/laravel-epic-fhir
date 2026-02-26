@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 use OpenSSLAsymmetricKey;
 use RuntimeException;
 use Telemedicall\EpicFhir\Database\EpicDbConnection;
-use Telemedicall\EpicFhir\Support\EpicConfigTrait;
+use Telemedicall\EpicFhir\Database\Traits\EpicConfigTrait;
 
 abstract class BaseController
 {
