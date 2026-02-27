@@ -37,6 +37,12 @@ composer require arman747/laravel-fhir
 composer update
 composer dump-autoload
 ```
+Create keys on server
+```bash
+openssl genpkey –algorithm RSA –out private.key –pkeyopt rsa_keygen_bits:2048 
+openssl rsa –in private.key –pubout –out public.key
+```
+
 Set .env parameters
 ```bash
 EPIC_TOKEN_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token
@@ -53,6 +59,8 @@ EPIC_LIST_SUBJECT=
 EPIC_LIST_STATUS=current
 
 EPIC_DB_CONNECTION=mysql
+
+//Only for dedicated database
 EPIC_DB_HOST=localhost
 EPIC_DB_PORT=3306
 EPIC_DB_DATABASE=
