@@ -37,6 +37,30 @@ composer require arman747/laravel-fhir
 composer update
 composer dump-autoload
 ```
+# Set .env parameters
+```bash
+EPIC_TOKEN_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token
+EPIC_AUTH_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize
+EPIC_FHIR_BASE=https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4
+
+EPIC_PRIVATE_KEY_PATH=/home/admin/domains/telemedicall.com/etc/private.key
+EPIC_PUBLIC_KEY_PATH=/home/admin/domains/telemedicall.com/etc/public.key
+
+EPIC_COOKIE_DOMAIN=.telemedicall.com
+EPIC_ALLOWED_ROOT=telemedicall.com
+
+EPIC_LIST_SUBJECT=
+EPIC_LIST_STATUS=current
+
+EPIC_DB_CONNECTION=mysql
+EPIC_DB_HOST=localhost
+EPIC_DB_PORT=3306
+EPIC_DB_DATABASE=
+EPIC_DB_USERNAME=
+EPIC_DB_PASSWORD=
+
+
+```
 
 ## Publish assets
 Publish the configuration file and migration:
@@ -49,13 +73,13 @@ php artisan vendor:publish --tag=epic-fhir-config
 php artisan vendor:publish --tag=epic-fhir-migrations
 ```
 
-#Run the migration:
+# Run the migration:
 ```bash
 php artisan migrate
 ```
 This creates the epic_users table used for token & session persistence.
 
-#Basic Usage
+# Basic Usage
 Via Service Class / Facade
 
 ```bash
@@ -67,7 +91,7 @@ $service->initializeEpicConfig($overrides);
 return $service->ListSearch("A1000.1","68965e9f-a9c8-480b-a169-518b0cf9f68f");
 ```
 
-#Direct Controller Usage
+# Direct Controller Usage
 ```bash
 use Telemedicall\EpicFhir\Controllers\UserController;
 $overrides = [
@@ -78,7 +102,7 @@ $service = new UserController($overrides);
 return $service->SmartOnFhir("4383e929-5eb1-4aca-817c-4cd2769a917f");
 ```
 
-#SMART on FHIR Launch (Patient-authorized flow)
+# SMART on FHIR Launch (Patient-authorized flow)
 Defined routes:
 ```bash
 Route::prefix('fhir/R4')
@@ -92,7 +116,7 @@ Route::prefix('fhir/R4')
 
 Then link to /fhir/R4/SmartOnFhir/your-client-id.
 
-#Important Notes
+## Important Notes
 
 Tokens are stored in epic_users table and associated with a SessionHash cookie.
 Session expiration is set to 1 hour by default (configurable via jwt_exp_seconds + buffer).
