@@ -55,9 +55,6 @@ EPIC_PUBLIC_KEY_PATH=/home/admin/domains/telemedicall.com/etc/public.key
 EPIC_COOKIE_DOMAIN=.telemedicall.com
 EPIC_ALLOWED_ROOT=telemedicall.com
 
-EPIC_LIST_SUBJECT=
-EPIC_LIST_STATUS=current
-
 EPIC_DB_CONNECTION=mysql
 
 //Only for dedicated database
