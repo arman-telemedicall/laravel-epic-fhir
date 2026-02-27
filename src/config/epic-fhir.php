@@ -10,8 +10,8 @@ return [
     'jwt_exp_seconds'         => 300,
 
     // Very important → should be OUTSIDE version control!
-    'private_key_path'        => env('EPIC_PRIVATE_KEY_PATH', '/home/admin/domains/gblvck.com/etc/private.key'),
-    'public_key_path'         => env('EPIC_PUBLIC_KEY_PATH', '/home/admin/domains/gblvck.com/etc/public.key'),
+    'private_key_path'        => env('EPIC_PRIVATE_KEY_PATH', '/home/admin/domains/telemedicall.com/etc/private.key'),
+    'public_key_path'         => env('EPIC_PUBLIC_KEY_PATH', '/home/admin/domains/telemedicall.com/etc/public.key'),
 
     'session_cookie_lifetime' => 3600,
     'cookie_domain'           => env('EPIC_COOKIE_DOMAIN', '.telemedicall.com'),
@@ -36,5 +36,5 @@ return [
         'username' => env('EPIC_DB_USERNAME', 'admin_epic'),
         'password' => env('EPIC_DB_PASSWORD', 'K3xuPkXWhwR3zp3GtKag'),
     ],
-    'allowed_root' => env('EPIC_ALLOWED_ROOT', 'gblvck.com'),
+    'allowed_root' => env('EPIC_ALLOWED_ROOT', 'telemedicall.com'),
 ];
