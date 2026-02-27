@@ -37,7 +37,7 @@ composer require arman747/laravel-fhir
 composer update
 composer dump-autoload
 ```
-# Set .env parameters
+Set .env parameters
 ```bash
 EPIC_TOKEN_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token
 EPIC_AUTH_URL=https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize
@@ -91,7 +91,7 @@ $service->initializeEpicConfig($overrides);
 return $service->ListSearch("A1000.1","68965e9f-a9c8-480b-a169-518b0cf9f68f");
 ```
 
-# Direct Controller Usage
+Direct Controller Usage
 ```bash
 use Telemedicall\EpicFhir\Controllers\UserController;
 $overrides = [
@@ -102,7 +102,6 @@ $service = new UserController($overrides);
 return $service->SmartOnFhir("4383e929-5eb1-4aca-817c-4cd2769a917f");
 ```
 
-# SMART on FHIR Launch (Patient-authorized flow)
 Defined routes:
 ```bash
 Route::prefix('fhir/R4')
@@ -114,7 +113,7 @@ Route::prefix('fhir/R4')
 });
 ```
 
-Then link to /fhir/R4/SmartOnFhir/your-client-id.
+Then link to /fhir/R4/jwks/your-client-id.
 
 ## Important Notes
 
