@@ -87,6 +87,13 @@ This creates the epic_users table used for token & session persistence.
 # Basic Usage
 Via Service Class / Facade
 
+First add the user to the oracle_users table:
+```bash
+$service = app('EpicFhir');
+$service->AddUser('Clinicians or Administrative Users','A1001.1','68965e9f-a9c8-480b-a169-518b0cf9f68f','68965e9f-a9c8-480b-a169-518b0cf9f68f');
+```
+Then use user credentials like Client ID for other functions:
+
 ```bash
 $overrides = [
         "token_url" => "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize",
@@ -109,7 +116,7 @@ return $service->SmartOnFhir("4383e929-5eb1-4aca-817c-4cd2769a917f");
 
 Defined routes:
 ```bash
-Route::prefix('fhir/R4')
+Route::prefix('epic/fhir/R4')
             ->middleware('web')           // applies session, CSRF, etc.
             ->group(function () {
                 Route::get('/jwks/{clientId}', [UserController::class, 'jwks'])->name('EpicFhir.jwks');
@@ -118,7 +125,7 @@ Route::prefix('fhir/R4')
 });
 ```
 
-Then link to /fhir/R4/jwks/your-client-id.
+Then link to /epic/fhir/R4/jwks/your-client-id.
 
 ## Important Notes
 
