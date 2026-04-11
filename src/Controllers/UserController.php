@@ -271,7 +271,7 @@ class UserController extends BaseController
         }
 
         $scheme = request()->secure() ? 'https' : 'http';
-        $redirectUri = "{$scheme}://{$host}/fhir/R4/Callback";
+        $redirectUri = "{$scheme}://{$host}/epic/fhir/R4/Callback";
 
         $state = bin2hex(random_bytes(16));
         Session::put('oauth2_state', $state);
@@ -322,7 +322,7 @@ class UserController extends BaseController
         }
 
         $scheme = request()->secure() ? 'https' : 'http';
-        $redirectUri = "{$scheme}://{$host}/fhir/R4/Callback";
+        $redirectUri = "{$scheme}://{$host}/epic/fhir/R4/Callback";
 
         $response = Http::asForm()->post($this->epicConfig('token_url'), [
             'grant_type'    => 'authorization_code',
