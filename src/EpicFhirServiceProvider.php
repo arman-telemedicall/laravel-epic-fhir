@@ -18,9 +18,9 @@ class EpicFhirServiceProvider extends ServiceProvider
             __DIR__.'/Database/Migrations' => database_path('migrations'),
         ], 'epic-fhir-migrations');
 
-		Route::get('/jwks/{clientId}', [UserController::class, 'jwks']);
+		Route::get('epic/jwks/{clientId}', [UserController::class, 'jwks']);
 
-        Route::prefix('fhir/R4')
+        Route::prefix('epic/fhir/R4')
             ->middleware('web')           // applies session, CSRF, etc.
             ->group(function () {
                 Route::get('/jwks/{clientId}', [UserController::class, 'jwks'])->name('EpicFhir.jwks');
