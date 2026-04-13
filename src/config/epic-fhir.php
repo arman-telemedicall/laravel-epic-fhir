@@ -32,9 +32,9 @@ return [
         //dedicated connection:
         'host'     => env('EPIC_DB_HOST', 'localhost'),
         'port'     => env('EPIC_DB_PORT', '3306'),
-        'database' => env('EPIC_DB_DATABASE', 'admin_epic'),
-        'username' => env('EPIC_DB_USERNAME', 'admin_epic'),
-        'password' => env('EPIC_DB_PASSWORD', 'K3xuPkXWhwR3zp3GtKag'),
+        'database' => env('EPIC_DB_DATABASE', ''),
+        'username' => env('EPIC_DB_USERNAME', ''),
+        'password' => env('EPIC_DB_PASSWORD', ''),
     ],
     'allowed_root' => env('EPIC_ALLOWED_ROOT', 'telemedicall.com'),
 ];
