@@ -1,12 +1,13 @@
 <?php
-namespace Telemedicall\EpicFhir\Facades;
+
+namespace Teleminergmbh\EpicFhir\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
-class EpicFhir extends Facade {
-	
-    protected static function getFacadeAccessor() 
-	{
-        return \Telemedicall\EpicFhir\Services\EpicFhirService::class;
+class EpicFhir extends Facade
+{
+    protected static function getFacadeAccessor()
+    {
+        return \Teleminergmbh\EpicFhir\EpicFhir::class;
     }
 }

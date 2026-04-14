@@ -1,376 +1,218 @@
 <?php
 
-namespace Telemedicall\EpicFhir\Controllers;
+namespace Teleminergmbh\EpicFhir\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Session;
-use RuntimeException;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
+use Teleminergmbh\EpicFhir\Contracts\EpicFhirHttpClientInterface;
+use Teleminergmbh\EpicFhir\Contracts\EpicFhirRequestConfigResolverInterface;
+use Teleminergmbh\EpicFhir\Contracts\EpicFhirTokenStoreInterface;
 
 class UserController extends BaseController
 {
-    public function __construct(array $overrides = [])
-    {
+    private const SMART_FLOW_CACHE_PREFIX = 'epic_fhir:smart_flow:';
+
+    public function __construct(
+        protected EpicFhirHttpClientInterface $http,
+        protected EpicFhirTokenStoreInterface $tokens,
+        protected EpicFhirRequestConfigResolverInterface $resolver,
+        array $overrides = []
+    ) {
         parent::__construct($overrides);
+    }
+
+    protected function applyRequestOverrides(?string $clientId = null): void
+    {
+        $overrides = $this->resolver->resolveForRequest(request(), $clientId);
+        if ($overrides !== []) {
+            $this->initializeEpicConfig($overrides);
+        }
     }
 
     /**
      * JWKS endpoint - returns public key in JWK format
      */
-    public function jwks(string $clientId): JsonResponse
+    public function jwks(?string $clientId = null): JsonResponse
     {
-        $publicKeyPath = $this->epicConfig('public_key_path');
+        $this->applyRequestOverrides($clientId);
 
-        $publicKeyPem = file_get_contents($publicKeyPath);
+        $publicKeyPem = file_get_contents($this->requirePublicKeyPath());
         if ($publicKeyPem === false) {
-            return $this->error("Unable to read public key file", 500);
+            return $this->error('Unable to read public key file', 500);
         }
 
-        $jwk = $this->pemToJwk($publicKeyPem, $clientId);
+        $jwk = $this->pemToJwk($publicKeyPem, $clientId ?? '');
 
         return $this->json([
-            'keys' => [$jwk]
+            'keys' => [$jwk],
         ]);
-    }
-
-    /**
-     * Add / register a new Epic user record
-     */
-    public function AddUser(
-        ?string $appAudience,
-        ?string $userId,
-        ?string $clientId,
-        ?string $npClientId,
-        ?string $token = null,
-        ?string $sessionHash = null,
-        ?string $sessionExp = null
-    ): int {
-        $insertedId = $this->db->connection()
-            ->table('epic_users')
-            ->insertGetId([
-                'AppAudience'   => $appAudience,
-                'UserID'        => $userId,
-                'ClientID'      => $clientId,
-                'NPClientID'    => $npClientId,
-                'Token'         => $token,
-                'DateRegistered' => now(),
-                'SessionHash'   => $sessionHash,
-                'SessionEXP'    => $sessionExp ? now()->parse($sessionExp) : null,
-            ]);
-
-        return $insertedId;
-    }
-
-    public function ListSearch(string $userId, string $clientId): string|JsonResponse
-    {
-        $token = $this->ensureValidToken($userId, $clientId);
-
-        $url = $this->buildListUrl([
-            'code'      => $this->epicConfig('list_code'),
-            'identifier' => $this->epicConfig('system_lists_identifier'),
-            'subject'   => $this->epicConfig('list_subject'),
-            'status'    => $this->epicConfig('list_status'),
-        ]);
-
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$token}",
-            'Accept'        => 'application/fhir+json',
-        ])->get($url);
-
-        if ($response->failed()) {
-            return $this->error("FHIR List search failed", $response->status());
-        }
-
-        return $response->body();
-    }
-
-    public function MyListSearch(string $userId, string $clientId): string|JsonResponse
-    {
-        $token = $this->ensureValidToken($userId, $clientId);
-
-        $url = $this->buildListUrl([
-            'code'       => $this->epicConfig('list_code'),
-            'identifier' => $this->epicConfig('user_lists_identifier'),
-            'status'     => $this->epicConfig('list_status'),
-        ]);
-
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$token}",
-            'Accept'        => 'application/fhir+json',
-        ])->get($url);
-
-        if ($response->failed()) {
-            return $this->error("My Lists search failed", $response->status());
-        }
-
-        return $response->body();
-    }
-
-    public function ListRead(string $userId, string $clientId, ?string $listId = null): string|JsonResponse
-    {
-        if (!$listId) {
-            return $this->error("No List ID received", 400);
-        }
-
-        $token = $this->ensureValidToken($userId, $clientId);
-
-        $url = $this->epicConfig('fhir_base') . "/List/{$listId}";
-
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$token}",
-            'Accept'        => 'application/fhir+json',
-        ])->get($url);
-
-        if ($response->failed()) {
-            return $this->error("List read failed", $response->status());
-        }
-
-        return $response->body();
-    }
-
-    public function PatientSummary(string $userId, string $clientId, ?string $patientId = null): string|JsonResponse
-    {
-        $token = $this->ensureValidToken($userId, $clientId);
-
-        if (!$patientId) {
-            $patientId = Session::get('PatientID');
-            if (!$patientId) {
-                return $this->error("No patient selected from Epic", 404);
-            }
-        }
-
-        $url = $this->epicConfig('fhir_base') . "/Patient/{$patientId}/\$summary";
-
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$token}",
-            'Accept'        => 'application/fhir+json',
-        ])->get($url);
-
-        if ($response->failed()) {
-            return $this->error("Patient summary failed", $response->status());
-        }
-
-        return $response->body();
-    }
-
-    public function PatientCreate(string $userId, string $clientId, array $patientData): JsonResponse
-    {
-        $token = $this->ensureValidToken($userId, $clientId);
-
-        $required = ['familyName', 'givenName', 'gender', 'birthDate'];
-        foreach ($required as $field) {
-            if (empty($patientData[$field])) {
-                return $this->error("Missing required field: {$field}", 400);
-            }
-        }
-
-        $patient = $this->buildPatientResource($patientData);
-
-        $url = $this->epicConfig('fhir_base') . '/Patient';
-
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$token}",
-            'Accept'        => 'application/fhir+json',
-            'Content-Type'  => 'application/fhir+json',
-        ])->post($url, $patient);
-
-        if ($response->failed()) {
-            return $this->error(
-                "Epic API Error ({$response->status()}): " . $response->body(),
-                $response->status()
-            );
-        }
-
-        $location = $response->header('Location');
-
-        return $this->json([
-            'status'   => $response->status(),
-            'location' => $location,
-            'body'     => $response->json(),
-        ], $response->status());
-    }
-
-    // ────────────────────────────────────────────────
-    //  Helpers
-    // ────────────────────────────────────────────────
-
-    private function buildListUrl(array $params): string
-    {
-        $query = http_build_query(array_filter($params));
-        return $this->epicConfig('fhir_base') . '/List' . ($query ? "?{$query}" : '');
-    }
-
-    private function buildPatientResource(array $data): array
-    {
-        $patient = [
-            'resourceType' => 'Patient',
-            'identifier'   => array_values(array_filter([
-                !empty($data['identifierSystem1']) && !empty($data['identifierValue1'])
-                    ? ['use' => 'usual', 'system' => $data['identifierSystem1'], 'value' => $data['identifierValue1']]
-                    : null,
-                !empty($data['identifierSystem2']) && !empty($data['identifierValue2'])
-                    ? ['use' => 'usual', 'system' => $data['identifierSystem2'], 'value' => $data['identifierValue2']]
-                    : null,
-            ])),
-
-            'name' => [
-                [
-                    'use'    => 'official',
-                    'family' => $data['familyName'],
-                    'given'  => [$data['givenName']],
-                    'suffix' => !empty($data['suffix']) ? [$data['suffix']] : [],
-                ],
-            ],
-
-            'telecom' => array_values(array_filter([
-                !empty($data['phone'])
-                    ? ['system' => 'phone', 'value' => $data['phone'], 'use' => 'home']
-                    : null,
-                !empty($data['email'])
-                    ? ['system' => 'email', 'value' => $data['email']]
-                    : null,
-            ])),
-
-            'gender'    => $data['gender'],
-            'birthDate' => $data['birthDate'],
-
-            'address' => [
-                [
-                    'use'        => 'home',
-                    'line'       => array_values(array_filter([
-                        $data['addressLine1'] ?? null,
-                        $data['addressLine2'] ?? null,
-                    ])),
-                    'city'       => $data['city'] ?? '',
-                    'state'      => $data['state'] ?? '',
-                    'postalCode' => $data['postalCode'] ?? '',
-                    'country'    => $data['country'] ?? '',
-                ],
-            ],
-
-            'maritalStatus' => [
-                'text' => $data['maritalStatus'] ?? '',
-            ],
-        ];
-
-        return $patient;
     }
 
     // ────────────────────────────────────────────────
     //  SMART on FHIR related methods
     // ────────────────────────────────────────────────
 
-    public function SmartOnFhir(string $clientId)
+    public function smartLaunch(string $clientId): RedirectResponse|JsonResponse
     {
-        Session::put('ClientID', $clientId);
+        $this->applyRequestOverrides($clientId);
+
+        $ownerKey = request()->query('ownerKey');
+        if (! is_string($ownerKey) || $ownerKey === '') {
+            return $this->error('Missing ownerKey. Pass ?ownerKey=... when starting SMART flow.', 400);
+        }
 
         $host = strtolower(parse_url(request()->url(), PHP_URL_HOST));
         $allowedRoot = $this->epicConfig('allowed_root');
-        if ($host !== $allowedRoot && !str_ends_with($host, '.' . $allowedRoot)) {
-            return $this->error("Invalid host for redirect URI", 400);
+        if ($host !== $allowedRoot && ! str_ends_with($host, '.'.$allowedRoot)) {
+            return $this->error('Invalid host for redirect URI', 400);
         }
 
-        $scheme = request()->secure() ? 'https' : 'http';
-        $redirectUri = "{$scheme}://{$host}/fhir/R4/Callback";
+        $redirectUri = $this->smartRedirectUri($host);
 
         $state = bin2hex(random_bytes(16));
-        Session::put('oauth2_state', $state);
 
-        $codeVerifier  = $this->generateCodeVerifier();
+        $codeVerifier = $this->generateCodeVerifier();
         $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
-        Session::put('code_verifier', $codeVerifier);
+        $ttlSeconds = (int) $this->epicConfig('smart_flow_ttl_seconds', 600);
+        Cache::put($this->smartFlowCacheKey($state), [
+            'client_id' => $clientId,
+            'owner_key' => $ownerKey,
+            'code_verifier' => $codeVerifier,
+        ], now()->addSeconds(max(30, $ttlSeconds)));
 
         $params = [
-            'client_id'             => $clientId,
-            'scope'                 => $this->epicConfig('smart_scope'),
-            'response_type'         => 'code',
-            'redirect_uri'          => $redirectUri,
-            'state'                 => $state,
+            'client_id' => $clientId,
+            'scope' => $this->epicConfig('smart_scope'),
+            'response_type' => 'code',
+            'redirect_uri' => $redirectUri,
+            'state' => $state,
             'code_challenge_method' => $this->epicConfig('code_challenge_method'),
-            'code_challenge'        => $codeChallenge,
-            'aud'                   => $this->epicConfig('fhir_base'),
+            'code_challenge' => $codeChallenge,
+            'aud' => $this->epicConfig('fhir_base'),
         ];
 
-        $authUrl = $this->epicConfig('auth_url') . '?' . http_build_query($params);
+        $authUrl = $this->epicConfig('auth_url').'?'.http_build_query($params);
 
         return redirect()->away($authUrl);
     }
 
-    public function Callback()
+    public function smartCallback(): string|JsonResponse
     {
-		$code = request()->query('code'); 
-		if (!$code) error;
-		$state = request()->query('state'); 
-		if ($state !== session('oauth2_state')) error;
-		
-        $clientId = Session::get('ClientID');
+        $this->applyRequestOverrides();
 
-        if (!$code) {
-            return $this->error("No authorization code received", 400);
+        $code = request()->query('code');
+        if (! $code) {
+            return $this->error('No authorization code received', 400);
+        }
+        $state = request()->query('state');
+        if (! is_string($state) || $state === '') {
+            return $this->error('Invalid state', 400);
         }
 
-        $codeVerifier = Session::get('code_verifier');
-        if (!$codeVerifier) {
-            return $this->error("Missing PKCE verifier (session expired)", 400);
+        $flow = Cache::pull($this->smartFlowCacheKey($state));
+        if (! is_array($flow)) {
+            return $this->error('Invalid or expired state', 400);
+        }
+
+        $clientId = $flow['client_id'] ?? null;
+        if (! is_string($clientId) || $clientId === '') {
+            return $this->error('Invalid or expired state', 400);
+        }
+
+        $ownerKey = $flow['owner_key'] ?? null;
+        if (! is_string($ownerKey) || $ownerKey === '') {
+            return $this->error('Invalid or expired state', 400);
+        }
+
+        $codeVerifier = $flow['code_verifier'] ?? null;
+        if (! is_string($codeVerifier) || $codeVerifier === '') {
+            return $this->error('Invalid or expired state', 400);
         }
 
         $host = strtolower(parse_url(request()->url(), PHP_URL_HOST));
-        $allowedRoot = $this->epicConfig('allowed_root');;
-        if ($host !== $allowedRoot && !str_ends_with($host, '.' . $allowedRoot)) {
-            return $this->error("Invalid host for redirect URI", 400);
+        $allowedRoot = $this->epicConfig('allowed_root');
+        if ($host !== $allowedRoot && ! str_ends_with($host, '.'.$allowedRoot)) {
+            return $this->error('Invalid host for redirect URI', 400);
+        }
+
+        $redirectUri = $this->smartRedirectUri($host);
+
+        try {
+            $tokenData = $this->http->postForm($this->epicConfig('token_url'), [
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+                'redirect_uri' => $redirectUri,
+                'client_id' => $clientId,
+                'code_verifier' => $codeVerifier,
+                'aud' => $this->epicConfig('fhir_base'),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->error('Token exchange failed: '.$e->getMessage(), 500);
+        }
+
+        $accessToken = $tokenData['access_token'] ?? null;
+        if (! is_string($accessToken) || $accessToken === '') {
+            return $this->error('No access_token received from token endpoint', 500);
+        }
+
+        $expiresIn = (int) ($tokenData['expires_in'] ?? 0);
+        $expiresAt = $expiresIn > 0 ? (time() + max(0, $expiresIn)) : null;
+        $ttl = is_int($expiresAt) ? max(0, $expiresAt - time()) : null;
+
+        $this->tokens->put($clientId, 'smart', $ownerKey, [
+            'access_token' => $accessToken,
+            'refresh_token' => is_string($tokenData['refresh_token'] ?? null) ? $tokenData['refresh_token'] : null,
+            'expires_at' => $expiresAt,
+            'scope' => is_string($tokenData['scope'] ?? null) ? $tokenData['scope'] : null,
+            'token_type' => is_string($tokenData['token_type'] ?? null) ? $tokenData['token_type'] : null,
+            'patient_id' => is_string($tokenData['patient'] ?? null) ? $tokenData['patient'] : null,
+        ], $ttl);
+
+        return $this->smartPatientSummary($accessToken, is_string($tokenData['patient'] ?? null) ? $tokenData['patient'] : null);
+    }
+
+    private function smartFlowCacheKey(string $state): string
+    {
+        return self::SMART_FLOW_CACHE_PREFIX.$state;
+    }
+
+    public function smartPatientSummary(?string $accessToken = null, ?string $patientId = null): string|JsonResponse
+    {
+        if (! $accessToken || ! $patientId) {
+            return $this->error('Missing access_token or patient_id', 400);
+        }
+
+        $url = $this->epicConfig('fhir_base')."/Patient/{$patientId}/\$summary";
+
+        try {
+            $body = $this->http->getJson($url, [
+                'Authorization' => "Bearer {$accessToken}",
+                'Accept' => 'application/fhir+json',
+            ]);
+        } catch (\Throwable $e) {
+            return $this->error('SMART Patient summary failed: '.$e->getMessage(), 500);
+        }
+
+        return json_encode($body);
+    }
+
+    private function smartRedirectUri(string $host): string
+    {
+        $baseUrl = $this->epicConfig('base_url');
+        if (is_string($baseUrl) && $baseUrl !== '') {
+            $baseUrl = rtrim($baseUrl, '/');
+            $prefix = trim((string) $this->epicConfig('routes.prefix', 'fhir/R4'), '/');
+
+            return $baseUrl.'/'.$prefix.'/smart/callback';
         }
 
         $scheme = request()->secure() ? 'https' : 'http';
-        $redirectUri = "{$scheme}://{$host}/fhir/R4/Callback";
+        $prefix = trim((string) $this->epicConfig('routes.prefix', 'fhir/R4'), '/');
 
-        $response = Http::asForm()->post($this->epicConfig('token_url'), [
-            'grant_type'    => 'authorization_code',
-            'code'          => $code,
-            'redirect_uri'  => $redirectUri,
-            'client_id'     => $clientId,
-            'code_verifier' => $codeVerifier,
-            'aud'           => $this->epicConfig('fhir_base'),
-        ]);
-
-        if ($response->failed()) {
-            return $this->error("Token exchange failed: " . $response->body(), $response->status());
-        }
-
-        $tokenData = $response->json();
-
-        Session::put('access_token', $tokenData['access_token'] ?? null);
-        Session::put('patient_id', $tokenData['patient'] ?? null);
-
-        return $this->SmartPatientSummary(
-            $tokenData['access_token'],
-            $tokenData['patient']
-        );
+        return "{$scheme}://{$host}/{$prefix}/smart/callback";
     }
-
-    public function SmartPatientSummary(?string $accessToken = null, ?string $patientId = null): string|JsonResponse
-    {
-        if (!$accessToken || !$patientId) {
-            return $this->error("Missing access_token or patient_id", 400);
-        }
-
-        $url = $this->epicConfig('fhir_base') . "/Patient/{$patientId}/\$summary";
-
-        $response = Http::withHeaders([
-            'Authorization' => "Bearer {$accessToken}",
-            'Accept'        => 'application/fhir+json',
-        ])->get($url);
-
-        if ($response->failed()) {
-            return $this->error("SMART Patient summary failed", $response->status());
-        }
-
-        return $response->body();
-    }
-
-    // ────────────────────────────────────────────────
-    //  PKCE helpers
-    // ────────────────────────────────────────────────
 
     private function generateCodeVerifier(): string
     {

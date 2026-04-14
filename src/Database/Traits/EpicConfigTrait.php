@@ -1,6 +1,6 @@
 <?php
 
-namespace Telemedicall\EpicFhir\Database\Traits;
+namespace Teleminergmbh\EpicFhir\Database\Traits;
 
 use Illuminate\Support\Arr;
 
@@ -9,31 +9,27 @@ trait EpicConfigTrait
     /**
      * The merged configuration array.
      *
-     * @var array
+     * @var array<string, mixed>
      */
     protected array $epicConfig = [];
 
     /**
      * Merge package defaults with Laravel config + optional runtime overrides.
-     *
-     * @param  array  $overrides
-     * @return array
+     */
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
      */
     public function initializeEpicConfig(array $overrides = []): array
     {
         // Start with Laravel config (published config/epic-fhir.php)
-        $config = config('EpicFhir', []);
+        $config = config('laravel-epic-fhir', []);
 
         // Merge defaults → published config → runtime overrides
         $merged = array_replace_recursive(
             $config,
             $overrides
         );
-
-        // Ensure key paths are resolved (prevent null or empty breaking openssl)
-        $merged['private_key_path'] = $this->resolveKeyPath($merged['private_key_path']);
-
-        $merged['public_key_path'] = $this->resolveKeyPath($merged['public_key_path']);
 
         $this->epicConfig = $merged;
 
@@ -43,8 +39,7 @@ trait EpicConfigTrait
     /**
      * Get a config value using dot notation.
      *
-     * @param  string  $key
-     * @param  mixed   $default
+     * @param  mixed  $default
      * @return mixed
      */
     public function epicConfig(string $key, $default = null)
@@ -55,9 +50,7 @@ trait EpicConfigTrait
     /**
      * Set a config value at runtime (useful for testing or dynamic changes).
      *
-     * @param  string  $key
-     * @param  mixed   $value
-     * @return void
+     * @param  mixed  $value
      */
     public function setEpicConfig(string $key, $value): void
     {
@@ -67,25 +60,33 @@ trait EpicConfigTrait
     /**
      * Get the full config array.
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function allEpicConfig(): array
     {
         return $this->epicConfig;
     }
 
+    public function requirePrivateKeyPath(): string
+    {
+        return $this->resolveKeyPath($this->epicConfig('private_key_path'));
+    }
+
+    public function requirePublicKeyPath(): string
+    {
+        return $this->resolveKeyPath($this->epicConfig('public_key_path'));
+    }
+
     /**
      * Resolve and validate key file path.
      *
-     * @param  string|null  $path
-     * @return string
      * @throws \RuntimeException
      */
     protected function resolveKeyPath(?string $path): string
     {
-        if (empty($path) || !file_exists($path) || !is_readable($path)) {
+        if (empty($path) || ! file_exists($path) || ! is_readable($path)) {
             throw new \RuntimeException(
-                "Epic FHIR key file not found or not readable: " . ($path ?? 'null')
+                'Epic FHIR key file not found or not readable: '.($path ?? 'null')
             );
         }
 
