@@ -69,6 +69,13 @@ class EpicFhirFhirClient implements EpicFhirFhirClientInterface
         return $this->getFhir($clientId, "/Patient/{$patientId}/\$summary", $token);
     }
 
+	public function patientSystem(string $clientId, string $patientId): string
+    {
+        $token = $this->auth->getSystemAccessToken($clientId);
+
+        return $this->getFhir($clientId, "/Patient/{$patientId}", $token);
+    }
+
     public function patientCreateSystem(string $clientId, array $patientData): array
     {
         $token = $this->auth->getSystemAccessToken($clientId);
