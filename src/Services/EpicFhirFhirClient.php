@@ -161,7 +161,7 @@ class EpicFhirFhirClient implements EpicFhirFhirClientInterface
         $url = rtrim((string) $this->epicConfig('fhir_base'), '/').$path;
 
         try {
-            $body = $this->http->postJson($url, $payload, [
+            $body = $this->http->postHeader($url, $payload, [
                 'Authorization' => "Bearer {$accessToken}",
                 'Accept' => 'application/fhir+json',
                 'Content-Type' => 'application/fhir+json',
