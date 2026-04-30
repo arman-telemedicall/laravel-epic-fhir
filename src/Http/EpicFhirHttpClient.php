@@ -48,7 +48,7 @@ class EpicFhirHttpClient implements EpicFhirHttpClientInterface
         $response = $this->request($headers)->post($url, $payload);
         $response->throw();
 
-        return (array) $response->json();
+        return (array) $response->headers();
     }
 
     /**
