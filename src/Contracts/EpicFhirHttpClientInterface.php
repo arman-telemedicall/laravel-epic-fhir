@@ -19,6 +19,8 @@ interface EpicFhirHttpClientInterface
      */
     public function postJson(string $url, array $payload, array $headers = []): array;
 
+	public function postHeader(string $url, array $payload, array $headers = []): array;
+
     /**
      * @param  array<string, scalar|null>  $payload
      * @return array<string, mixed>
