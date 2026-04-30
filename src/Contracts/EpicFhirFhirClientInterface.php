@@ -15,6 +15,8 @@ interface EpicFhirFhirClientInterface
 
     public function patientSummarySystem(string $clientId, string $patientId): string;
 
+	public function patientSystem(string $clientId, string $patientId): string;
+
     /** @param array<string, mixed> $patientData */
     public function patientCreateSystem(string $clientId, array $patientData): array;
 
